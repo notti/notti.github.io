@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timer</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        #timer {
+            font-size: 5em;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 40px 20px;
+            font-size: 1.5em;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="timer">30</div>
+
+    <div style="display: flex; gap: 10px;">
+        <button onclick="startTimer()">Start Timer</button>
+        <button onclick="stopTimer()">Stop Timer</button>
+    </div>
+    <div>
+        <label for="wakeLockCheckbox">Request Wake Lock</label>
+        <input type="checkbox" id="wakeLockCheckbox">
+    </div>
+    <div id="statusDiv"></div>
+
+    <script>
+        let interval = null;
+        let seconds = 30;
+
+        function startTimer() {
+            const timerElement = document.getElementById('timer');
+            interval = setInterval(() => {
+                seconds--;
+                timerElement.textContent = seconds;
+                if (seconds == 20) {
+                    navigator.vibrate([200]);
+                } else if (seconds == 10) {
+                    navigator.vibrate([200, 100, 200]);
+                }
+                if (seconds <= 0) {
+                    seconds = 30;
+                    navigator.vibrate([200, 100, 200, 100, 200]);
+                }
+            }, 1000);
+        }
+
+        function stopTimer() {
+            seconds = 30;
+            document.getElementById('timer').textContent = seconds;
+            if (interval !== null) {
+                clearInterval(interval);
+                interval = null;
+            }
+            interval = null;
+        }
+
+        if ('WakeLock' in window && 'request' in window.WakeLock) {
+            let wakeLock = null;
+
+            const wakeLockCheckbox = document.querySelector('#wakeLockCheckbox');
+            const statusDiv = document.querySelector('#statusDiv');
+
+            const requestWakeLock = () => {
+                const controller = new AbortController();
+                const signal = controller.signal;
+                window.WakeLock.request('screen', { signal })
+                    .catch((e) => {
+                        if (e.name === 'AbortError') {
+                            wakeLockCheckbox.checked = false;
+                            statusDiv.textContent = 'Wake Lock was aborted';
+                            console.log('Wake Lock was aborted');
+                        } else {
+                            statusDiv.textContent = `${e.name}, ${e.message}`;
+                            console.error(`${e.name}, ${e.message}`);
+                        }
+                    });
+                wakeLockCheckbox.checked = true;
+                statusDiv.textContent = 'Wake Lock is active';
+                console.log('Wake Lock is active');
+                return controller;
+            };
+
+            wakeLockCheckbox.addEventListener('change', () => {
+                if (wakeLockCheckbox.checked) {
+                    wakeLock = requestWakeLock();
+                } else {
+                    wakeLock.abort();
+                    wakeLock = null;
+                }
+            });
+        } else if ('wakeLock' in navigator && 'request' in navigator.wakeLock) {
+            let wakeLock = null;
+
+            const requestWakeLock = async () => {
+                try {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    wakeLock.addEventListener('release', (e) => {
+                        console.log(e);
+                        wakeLockCheckbox.checked = false;
+                        statusDiv.textContent = 'Wake Lock was released';
+                        console.log('Wake Lock was released');
+                    });
+                    wakeLockCheckbox.checked = true;
+                    statusDiv.textContent = 'Wake Lock is active';
+                    console.log('Wake Lock is active');
+                } catch (e) {
+                    wakeLockCheckbox.checked = false;
+                    statusDiv.textContent = `${e.name}, ${e.message}`;
+                    console.error(`${e.name}, ${e.message}`);
+                }
+            };
+
+            wakeLockCheckbox.addEventListener('change', () => {
+                if (wakeLockCheckbox.checked) {
+                    requestWakeLock();
+                } else {
+                    wakeLock.release();
+                    wakeLock = null;
+                }
+            });
+        } else {
+            statusDiv.textContent = 'Wake Lock API not supported.';
+            console.error('Wake Lock API not supported.');
+        }
+    </script>
+</body>
+
+</html>
